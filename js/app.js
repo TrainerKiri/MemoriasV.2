@@ -238,13 +238,34 @@ class MemoriasApp {
         }
 
         this.currentAudio = new Audio(previewUrl);
-        this.currentAudio.play();
-        button.textContent = '⏸';
+        
+        // Add event listeners for better audio control
+        this.currentAudio.addEventListener('play', () => {
+            button.textContent = '⏸';
+        });
 
-        this.currentAudio.onended = () => {
+        this.currentAudio.addEventListener('pause', () => {
+            button.textContent = '▶';
+        });
+
+        this.currentAudio.addEventListener('ended', () => {
             button.textContent = '▶';
             this.currentAudio = null;
-        };
+        });
+
+        // Add error handling
+        this.currentAudio.addEventListener('error', () => {
+            console.error('Error playing audio');
+            button.textContent = '▶';
+            this.currentAudio = null;
+        });
+
+        // Start playing
+        this.currentAudio.play().catch(error => {
+            console.error('Error playing audio:', error);
+            button.textContent = '▶';
+            this.currentAudio = null;
+        });
     }
 
     async fazerLogin() {

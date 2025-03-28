@@ -26,6 +26,9 @@ body {
     background-color: var(--bg-darker);
     padding: 1.5rem;
     box-shadow: 0 2px 10px var(--shadow-color);
+    position: sticky;
+    top: 0;
+    z-index: 100;
 }
 
 .nav-bar h1 {
@@ -42,6 +45,11 @@ body {
     flex: 1;
     padding: 2rem;
     text-align: center;
+    background-attachment: fixed;
+    will-change: transform;
+    transform: translateZ(0);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
 }
 
 .modal {
@@ -177,7 +185,7 @@ button:hover {
 
 .imagem-memoria {
     width: 100%;
-    height: 300px;
+    max-height: 600px;
     object-fit: contain;
     border-radius: 8px;
     background-color: rgba(0, 0, 0, 0.2);
@@ -186,7 +194,7 @@ button:hover {
 
 .galeria-imagens {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 1.5rem;
     margin-top: 2rem;
 }
@@ -202,7 +210,7 @@ button:hover {
 
 .imagem-principal {
     width: 100%;
-    height: 500px;
+    height: 600px;
     object-fit: contain;
     border-radius: 8px;
     grid-column: 1 / -1;
@@ -323,11 +331,13 @@ button:hover {
 .track-name {
     font-weight: bold;
     color: var(--text-light);
+    margin-bottom: 0.25rem;
 }
 
 .track-artist {
     color: var(--text-gray);
     font-size: 0.9rem;
+    font-style: italic;
 }
 
 .memory-tracks {
@@ -341,28 +351,47 @@ button:hover {
     display: flex;
     align-items: center;
     padding: 1rem;
-    background-color: var(--bg-darker);
-    border-radius: 6px;
-    margin-bottom: 0.5rem;
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    margin-bottom: 0.75rem;
+    transition: background-color 0.3s ease;
+}
+
+.memory-track:hover {
+    background-color: rgba(0, 0, 0, 0.3);
 }
 
 .track-controls {
     display: flex;
+    align-items: center;
     gap: 0.5rem;
 }
 
 .play-button {
     background: none;
-    border: none;
+    border: 2px solid var(--primary-color);
     color: var(--text-light);
     cursor: pointer;
     padding: 0.5rem;
-    font-size: 1.5rem;
-    transition: color 0.3s ease;
+    font-size: 1.2rem;
+    transition: all 0.3s ease;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 1rem;
 }
 
 .play-button:hover {
-    color: var(--primary-color);
+    background-color: var(--primary-color);
+    color: var(--text-light);
+    transform: scale(1.1);
+}
+
+.play-button:active {
+    transform: scale(0.95);
 }
 
 .memory-track .delete-btn {
@@ -370,13 +399,36 @@ button:hover {
     font-size: 0.9rem;
 }
 
+#loginModal .modal-content {
+    max-width: 400px;
+    background-color: var(--bg-darker);
+    border: 1px solid var(--border-color);
+}
+
+#loginModal input {
+    margin-bottom: 1rem;
+}
+
+#loginModal button {
+    width: 100%;
+    margin-top: 1rem;
+}
+
 @media (min-width: 768px) {
     .memorias-lista {
-        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
     }
     
     .nav-bar h1 {
         font-size: 2.5rem;
+    }
+
+    .imagem-memoria {
+        max-height: 800px;
+    }
+
+    .imagem-principal {
+        height: 800px;
     }
 }
 
@@ -391,5 +443,9 @@ button:hover {
     
     .galeria-imagens {
         grid-template-columns: 1fr;
+    }
+
+    .conteudo-container {
+        background-attachment: scroll;
     }
 }

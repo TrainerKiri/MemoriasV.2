@@ -6,17 +6,33 @@ const corsHeaders = {
 }
 
 async function getSpotifyToken() {
-  const response = await fetch('https://accounts.spotify.com/api/token', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      Authorization: `Basic ${btoa(`${Deno.env.get('SPOTIFY_CLIENT_ID')}:${Deno.env.get('SPOTIFY_CLIENT_SECRET')}`)}`,
-    },
-    body: 'grant_type=client_credentials',
-  })
+  const clientId = Deno.env.get('SPOTIFY_CLIENT_ID')
+  const clientSecret = Deno.env.get('SPOTIFY_CLIENT_SECRET')
 
-  const data = await response.json()
-  return data.access_token
+  if (!clientId || !clientSecret) {
+    throw new Error('Missing Spotify credentials')
+  }
+
+  try {
+    const response = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
+      },
+      body: 'grant_type=client_credentials',
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to get Spotify token')
+    }
+
+    const data = await response.json()
+    return data.access_token
+  } catch (error) {
+    console.error('Error getting Spotify token:', error)
+    throw new Error('Failed to authenticate with Spotify')
+  }
 }
 
 Deno.serve(async (req) => {
@@ -40,9 +56,7 @@ Deno.serve(async (req) => {
 
     const token = await getSpotifyToken()
     const response = await fetch(
-      `https://api.spotify.com/v1/search?q=${encodeURIComponent(
-        query,
-      )}&type=track&limit=5`,
+      `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=5`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -50,14 +64,19 @@ Deno.serve(async (req) => {
       },
     )
 
+    if (!response.ok) {
+      throw new Error('Failed to search Spotify tracks')
+    }
+
     const data = await response.json()
 
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error) {
+    console.error('Error in Spotify search:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error.message || 'Internal server error' }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
