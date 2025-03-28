@@ -45,9 +45,6 @@ body {
     flex: 1;
     padding: 2rem;
     text-align: center;
-    background-attachment: fixed;
-    will-change: transform;
-    transform: translateZ(0);
     -webkit-backface-visibility: hidden;
     backface-visibility: hidden;
 }
@@ -412,6 +409,11 @@ button:hover {
 #loginModal button {
     width: 100%;
     margin-top: 1rem;
+    background-color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+    border-left-color: var(--primary-color) ;
+    border-top-color: var(--primary-color);
+    border-right-color: var(--primary-color);
 }
 
 @media (min-width: 768px) {
