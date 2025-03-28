@@ -446,8 +446,4 @@ button:hover {
     .galeria-imagens {
         grid-template-columns: 1fr;
     }
-
-    .conteudo-container {
-        background-attachment: scroll;
-    }
 }
