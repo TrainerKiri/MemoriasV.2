@@ -1,5 +1,4 @@
-import { signIn, signOut, isAdmin, createMemory, getMemories, deleteMemory, uploadImage, getMemoryById, addMemoryImages, updateMemory, addMemoryTrack, deleteMemoryTrack } from './supabase.js';
-import { searchTracks } from './spotify.js';
+import { signIn, signOut, isAdmin, createMemory, getMemories, deleteMemory, uploadImage, getMemoryById, addMemoryImages, updateMemory } from './supabase.js';
 
 const START_DATE = new Date("2025-01-06");
 
@@ -7,7 +6,8 @@ class MemoriasApp {
     constructor() {
         this.initializeElements();
         this.init();
-        this.currentAudio = null;
+        this.youtubePlayer = null;
+        this.initYouTubeAPI();
     }
 
     initializeElements() {
@@ -24,8 +24,7 @@ class MemoriasApp {
             memoriaForm: document.getElementById("memoriaForm"),
             memoriaModal: document.getElementById("memoriaModal"),
             memoriaDetalhes: document.getElementById("memoriaDetalhes"),
-            trackSearchInput: document.getElementById("trackSearch"),
-            trackResults: document.getElementById("trackResults")
+            youtubePlayer: document.getElementById("youtubePlayer")
         };
     }
 
@@ -34,6 +33,26 @@ class MemoriasApp {
         await this.loadMemories();
         this.setupEventListeners();
         this.startTimer();
+    }
+
+    initYouTubeAPI() {
+        if (!window.YT) {
+            const tag = document.createElement('script');
+            tag.src = 'https://www.youtube.com/iframe_api';
+            const firstScriptTag = document.getElementsByTagName('script')[0];
+            firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+        }
+
+        window.onYouTubeIframeAPIReady = () => {
+            console.log('YouTube API Ready');
+        };
+    }
+
+    getYouTubeVideoId(url) {
+        if (!url) return null;
+        const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+        const match = url.match(regExp);
+        return (match && match[2].length === 11) ? match[2] : null;
     }
 
     async checkAuthState() {
@@ -52,12 +71,20 @@ class MemoriasApp {
             this.elements.memoriasLista.style.display = 'block';
             const admin = await isAdmin();
 
+            if (!memories || memories.length === 0) {
+                this.elements.memoriasLista.innerHTML = '<p class="no-memories">Nenhuma memória encontrada.</p>';
+                return;
+            }
+
+            memories.sort((a, b) => new Date(a.date) - new Date(b.date));
+
             memories.forEach(memory => {
                 const memoriaElement = this.createMemoryElement(memory, admin);
                 this.elements.memoriasLista.appendChild(memoriaElement);
             });
         } catch (error) {
             console.error('Erro ao carregar memórias:', error);
+            this.elements.memoriasLista.innerHTML = '<p class="error">Erro ao carregar memórias. Por favor, tente novamente.</p>';
         }
     }
 
@@ -80,6 +107,7 @@ class MemoriasApp {
             </div>
             <p class="memoria-description">${memory.description}</p>
             ${memory.image_url ? `<img src="${memory.image_url}" class="imagem-memoria" alt="${memory.title}">` : ''}
+            ${memory.youtube_url ? '<div class="youtube-indicator">🎵 Música disponível</div>' : ''}
             ${isAdmin ? `
                 <div class="admin-controls">
                     <button class="edit-btn" data-id="${memory.id}">Editar</button>
@@ -120,28 +148,7 @@ class MemoriasApp {
             document.getElementById('tituloMemoria').value = memory.title;
             document.getElementById('descricaoMemoria').value = memory.description;
             document.getElementById('dataMemoria').value = memory.date;
-
-            const tracksList = document.getElementById('currentTracks');
-            tracksList.innerHTML = '';
-            
-            if (memory.memory_tracks) {
-                memory.memory_tracks.forEach(track => {
-                    const trackElement = document.createElement('div');
-                    trackElement.className = 'memory-track';
-                    trackElement.innerHTML = `
-                        <div class="track-info">
-                            <div class="track-name">${track.track_name}</div>
-                            <div class="track-artist">${track.artist_name}</div>
-                        </div>
-                        <button class="delete-btn" data-id="${track.id}">Remover</button>
-                    `;
-
-                    const deleteBtn = trackElement.querySelector('.delete-btn');
-                    deleteBtn.addEventListener('click', () => this.removerTrack(track.id));
-
-                    tracksList.appendChild(trackElement);
-                });
-            }
+            document.getElementById('youtubeUrl').value = memory.youtube_url || '';
 
             this.elements.addMemoriaModal.style.display = 'block';
             document.querySelector('.modal-content h2').textContent = 'Editar Memória';
@@ -164,30 +171,6 @@ class MemoriasApp {
                 year: 'numeric'
             });
 
-            let tracksHtml = '';
-            if (memory.memory_tracks && memory.memory_tracks.length > 0) {
-                tracksHtml = `
-                    <div class="memory-tracks">
-                        <h3>Músicas</h3>
-                        ${memory.memory_tracks.map(track => `
-                            <div class="memory-track">
-                                <div class="track-info">
-                                    <div class="track-name">${track.track_name}</div>
-                                    <div class="track-artist">${track.artist_name}</div>
-                                </div>
-                                <div class="track-controls">
-                                    ${track.preview_url ? `
-                                        <button class="play-button" data-preview="${track.preview_url}">
-                                            ▶
-                                        </button>
-                                    ` : ''}
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                `;
-            }
-
             this.elements.memoriaDetalhes.innerHTML = `
                 <h2>${memory.title}</h2>
                 <div class="data">${formattedDate}</div>
@@ -198,74 +181,81 @@ class MemoriasApp {
                             <img src="${memory.image_url}" alt="${memory.title}" class="imagem-principal">
                         </div>
                     ` : ''}
-                    ${memory.memory_images?.map(img => `
+                    ${memory.memory_images ? memory.memory_images.map(img => `
                         <div class="imagem-container">
                             <img src="${img.url}" alt="${img.description || ''}" class="imagem-galeria">
                             ${img.description ? `<p class="imagem-descricao">${img.description}</p>` : ''}
                         </div>
-                    `).join('') || ''}
+                    `).join('') : ''}
                 </div>
-                ${tracksHtml}
+                ${memory.youtube_url ? `
+                    <div class="music-controls">
+                        <button class="play-music" data-video-id="${this.getYouTubeVideoId(memory.youtube_url)}">
+                            <span class="play-icon">▶</span> Tocar Música
+                        </button>
+                    </div>
+                ` : ''}
             `;
 
-            this.setupAudioPlayers();
+            if (memory.youtube_url) {
+                const videoId = this.getYouTubeVideoId(memory.youtube_url);
+                if (videoId) {
+                    this.elements.youtubePlayer.innerHTML = '<div id="ytPlayer"></div>';
+                    if (this.youtubePlayer) {
+                        this.youtubePlayer.destroy();
+                    }
+
+                    // Wait for YouTube API to be ready
+                    const initPlayer = () => {
+                        if (window.YT && window.YT.Player) {
+                            this.youtubePlayer = new YT.Player('ytPlayer', {
+                                videoId: videoId,
+                                playerVars: {
+                                    autoplay: 0,
+                                    controls: 0,
+                                    disablekb: 1,
+                                    fs: 0,
+                                    modestbranding: 1,
+                                    playsinline: 1,
+                                    rel: 0,
+                                    showinfo: 0
+                                },
+                                events: {
+                                    onReady: (event) => {
+                                        const playButton = this.elements.memoriaDetalhes.querySelector('.play-music');
+                                        if (playButton) {
+                                            playButton.addEventListener('click', () => {
+                                                const icon = playButton.querySelector('.play-icon');
+                                                if (icon.textContent === '▶') {
+                                                    event.target.playVideo();
+                                                    icon.textContent = '⏸';
+                                                    playButton.querySelector('span:last-child').textContent = ' Pausar Música';
+                                                } else {
+                                                    event.target.pauseVideo();
+                                                    icon.textContent = '▶';
+                                                    playButton.querySelector('span:last-child').textContent = ' Tocar Música';
+                                                }
+                                            });
+                                        }
+                                    }
+                                }
+                            });
+                        } else {
+                            setTimeout(initPlayer, 100);
+                        }
+                    };
+
+                    initPlayer();
+                }
+            } else {
+                this.elements.youtubePlayer.innerHTML = '';
+            }
+
             this.elements.memoriaModal.style.display = 'block';
         } catch (error) {
             console.error('Erro ao abrir memória:', error);
+            alert('Erro ao abrir memória');
         }
-    }
-
-    setupAudioPlayers() {
-        const playButtons = document.querySelectorAll('.play-button');
-        playButtons.forEach(button => {
-            button.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const previewUrl = button.dataset.preview;
-                this.playPreview(previewUrl, button);
-            });
-        });
-    }
-
-    playPreview(previewUrl, button) {
-        if (this.currentAudio) {
-            this.currentAudio.pause();
-            document.querySelectorAll('.play-button').forEach(btn => btn.textContent = '▶');
-        }
-
-        if (this.currentAudio && this.currentAudio.src === previewUrl) {
-            this.currentAudio = null;
-            return;
-        }
-
-        this.currentAudio = new Audio(previewUrl);
-        
-        // Add event listeners for better audio control
-        this.currentAudio.addEventListener('play', () => {
-            button.textContent = '⏸';
-        });
-
-        this.currentAudio.addEventListener('pause', () => {
-            button.textContent = '▶';
-        });
-
-        this.currentAudio.addEventListener('ended', () => {
-            button.textContent = '▶';
-            this.currentAudio = null;
-        });
-
-        // Add error handling
-        this.currentAudio.addEventListener('error', () => {
-            console.error('Error playing audio');
-            button.textContent = '▶';
-            this.currentAudio = null;
-        });
-
-        // Start playing
-        this.currentAudio.play().catch(error => {
-            console.error('Error playing audio:', error);
-            button.textContent = '▶';
-            this.currentAudio = null;
-        });
     }
 
     async fazerLogin() {
@@ -294,7 +284,8 @@ class MemoriasApp {
             description: document.getElementById('descricaoMemoria').value,
             date: document.getElementById('dataMemoria').value,
             imageFile: document.getElementById('imagemMemoria').files[0],
-            additionalImages: document.getElementById('imagensAdicionais').files
+            additionalImages: document.getElementById('imagensAdicionais').files,
+            youtube_url: document.getElementById('youtubeUrl').value
         };
 
         try {
@@ -305,13 +296,11 @@ class MemoriasApp {
                 image_url = imageUrl;
             }
 
-            const date = new Date(formData.date);
-            const utcDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-            
             const memoryData = {
                 title: formData.title,
                 description: formData.description,
-                date: utcDate.toISOString().split('T')[0]
+                date: formData.date,
+                youtube_url: formData.youtube_url
             };
 
             if (image_url) {
@@ -369,75 +358,6 @@ class MemoriasApp {
         }
     }
 
-    async searchTracks(query) {
-        try {
-            const response = await searchTracks(query);
-            const tracks = response.tracks.items;
-            
-            this.elements.trackResults.innerHTML = tracks.map(track => `
-                <div class="track-item" data-track='${JSON.stringify(track)}'>
-                    <div class="track-info">
-                        <div class="track-name">${track.name}</div>
-                        <div class="track-artist">${track.artists[0].name}</div>
-                    </div>
-                    ${track.preview_url ? `
-                        <button class="play-button" data-preview="${track.preview_url}">▶</button>
-                    ` : ''}
-                </div>
-            `).join('');
-
-            this.setupTrackSelection();
-            this.setupAudioPlayers();
-        } catch (error) {
-            console.error('Erro ao buscar músicas:', error);
-            this.elements.trackResults.innerHTML = '<p>Erro ao buscar músicas</p>';
-        }
-    }
-
-    setupTrackSelection() {
-        const trackItems = document.querySelectorAll('.track-item');
-        trackItems.forEach(item => {
-            item.addEventListener('click', async () => {
-                const track = JSON.parse(item.dataset.track);
-                const memoryId = document.getElementById('memoriaId').value;
-                
-                try {
-                    const { error } = await addMemoryTrack(memoryId, track);
-                    if (error) throw error;
-                    
-                    const tracksList = document.getElementById('currentTracks');
-                    const trackElement = document.createElement('div');
-                    trackElement.className = 'memory-track';
-                    trackElement.innerHTML = `
-                        <div class="track-info">
-                            <div class="track-name">${track.name}</div>
-                            <div class="track-artist">${track.artists[0].name}</div>
-                        </div>
-                        <button class="delete-btn">Remover</button>
-                    `;
-                    
-                    tracksList.appendChild(trackElement);
-                } catch (error) {
-                    console.error('Erro ao adicionar música:', error);
-                    alert('Erro ao adicionar música');
-                }
-            });
-        });
-    }
-
-    async removerTrack(trackId) {
-        try {
-            const { error } = await deleteMemoryTrack(trackId);
-            if (error) throw error;
-            
-            const trackElement = document.querySelector(`[data-id="${trackId}"]`).parentElement;
-            trackElement.remove();
-        } catch (error) {
-            console.error('Erro ao remover música:', error);
-            alert('Erro ao remover música');
-        }
-    }
-
     startTimer() {
         const updateTimer = () => {
             const now = new Date();
@@ -473,15 +393,7 @@ class MemoriasApp {
             document.getElementById('memoriaId').value = '';
             document.getElementById('memoriaForm').reset();
             document.querySelector('.modal-content h2').textContent = 'Adicionar Memória';
-            document.getElementById('currentTracks').innerHTML = '';
             this.elements.addMemoriaModal.style.display = 'block';
-        });
-
-        this.elements.trackSearchInput?.addEventListener('input', (e) => {
-            const query = e.target.value.trim();
-            if (query.length >= 3) {
-                this.searchTracks(query);
-            }
         });
 
         window.addEventListener('click', (e) => {
@@ -508,10 +420,12 @@ class MemoriasApp {
     fecharModal() {
         if (this.elements.addMemoriaModal) this.elements.addMemoriaModal.style.display = 'none';
         if (this.elements.loginModal) this.elements.loginModal.style.display = 'none';
-        if (this.elements.memoriaModal) this.elements.memoriaModal.style.display = 'none';
-        if (this.currentAudio) {
-            this.currentAudio.pause();
-            this.currentAudio = null;
+        if (this.elements.memoriaModal) {
+            this.elements.memoriaModal.style.display = 'none';
+            if (this.youtubePlayer) {
+                this.youtubePlayer.destroy();
+                this.youtubePlayer = null;
+            }
         }
     }
 }

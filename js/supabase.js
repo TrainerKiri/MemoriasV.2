@@ -61,6 +61,7 @@ export async function createMemory(memory) {
             description: memory.description,
             date: memory.date,
             image_url: memory.image_url,
+            youtube_url: memory.youtube_url,
             user_id: user.id
         }])
         .select();
@@ -76,13 +77,6 @@ export async function getMemories() {
                 id,
                 url,
                 description
-            ),
-            memory_tracks (
-                id,
-                spotify_track_id,
-                track_name,
-                artist_name,
-                preview_url
             )
         `)
         .order('date', { ascending: true });
@@ -98,13 +92,6 @@ export async function getMemoryById(id) {
                 id,
                 url,
                 description
-            ),
-            memory_tracks (
-                id,
-                spotify_track_id,
-                track_name,
-                artist_name,
-                preview_url
             )
         `)
         .eq('id', id)
@@ -124,7 +111,8 @@ export async function updateMemory(id, memory) {
             title: memory.title,
             description: memory.description,
             date: memory.date,
-            image_url: memory.image_url
+            image_url: memory.image_url,
+            youtube_url: memory.youtube_url
         })
         .eq('id', id)
         .select();
@@ -183,38 +171,4 @@ export async function addMemoryImages(memoryId, images) {
         .select();
 
     return { data, error };
-}
-
-export async function addMemoryTrack(memoryId, track) {
-    const user = await getCurrentUser();
-    if (!user || user.id !== ADMIN_USER_ID) {
-        return { error: { message: 'Apenas o administrador pode adicionar músicas' } };
-    }
-
-    const { data, error } = await supabase
-        .from('memory_tracks')
-        .insert([{
-            memory_id: memoryId,
-            spotify_track_id: track.id,
-            track_name: track.name,
-            artist_name: track.artists[0].name,
-            preview_url: track.preview_url
-        }])
-        .select();
-
-    return { data, error };
-}
-
-export async function deleteMemoryTrack(trackId) {
-    const user = await getCurrentUser();
-    if (!user || user.id !== ADMIN_USER_ID) {
-        return { error: { message: 'Apenas o administrador pode excluir músicas' } };
-    }
-
-    const { error } = await supabase
-        .from('memory_tracks')
-        .delete()
-        .eq('id', trackId);
-
-    return { error };
 }
