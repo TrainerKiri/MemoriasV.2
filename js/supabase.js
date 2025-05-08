@@ -43,6 +43,38 @@ export async function isAdmin() {
     return user && user.id === ADMIN_USER_ID;
 }
 
+// Welcome Message functions
+export async function getWelcomeMessage() {
+    try {
+        const { data, error } = await supabase
+            .from('welcome_messages')
+            .select('message')
+            .single();
+        
+        if (error) throw error;
+        return data.message;
+    } catch (error) {
+        console.error('Error fetching welcome message:', error);
+        return null;
+    }
+}
+
+export async function updateWelcomeMessage(message) {
+    try {
+        const { data, error } = await supabase
+            .from('welcome_messages')
+            .update({ message })
+            .eq('id', (await supabase.from('welcome_messages').select('id').single()).data.id)
+            .select();
+
+        if (error) throw error;
+        return { data };
+    } catch (error) {
+        console.error('Error updating welcome message:', error);
+        return { error };
+    }
+}
+
 // Memory functions
 export async function createMemory(memory) {
     const user = await getCurrentUser();

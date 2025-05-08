@@ -1,4 +1,4 @@
-import { signIn, signOut, isAdmin, createMemory, getMemories, deleteMemory, uploadImage, getMemoryById, addMemoryImages, updateMemory, getCurrentUser } from './supabase.js';
+import { signIn, signOut, isAdmin, createMemory, getMemories, deleteMemory, uploadImage, getMemoryById, addMemoryImages, updateMemory, getCurrentUser, getWelcomeMessage, updateWelcomeMessage } from './supabase.js';
 
 const START_DATE = new Date("2025-01-06");
 
@@ -152,16 +152,7 @@ class MemoriasApp {
     }
 
     async loadWelcomeMessage() {
-        const welcomeMessage = localStorage.getItem('welcomeMessage') || `Bem-vindo à nossa Biblioteca de Memórias
-
-Aqui guardamos nossas memórias mais preciosas, cada uma delas uma página única em nossa história de amor.
-
-Sinta-se à vontade para explorar cada momento especial que compartilhamos.
-
-Role para baixo para continuar lendo...
-
-Com amor,
-O Senhor Aluado`;
+        const welcomeMessage = await getWelcomeMessage() || `Bem-vindo à nossa Biblioteca de Memórias\n\nAqui guardamos nossas memórias mais preciosas, cada uma delas uma página única em nossa história de amor.\n\nSinta-se à vontade para explorar cada momento especial que compartilhamos.\n\nRole para baixo para continuar lendo...\n\nCom amor,\nO Senhor Aluado`;
 
         const isAdminResult = await isAdmin();
         
@@ -200,11 +191,16 @@ O Senhor Aluado`;
                 editModal.style.display = 'block';
             });
 
-            editForm.addEventListener('submit', (e) => {
+            editForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const newMessage = document.getElementById('welcomeMessageEdit').value;
-                localStorage.setItem('welcomeMessage', newMessage);
-                this.loadWelcomeMessage();
+                const { error } = await updateWelcomeMessage(newMessage);
+                if (error) {
+                    console.error('Error updating welcome message:', error);
+                    alert('Erro ao atualizar mensagem de boas-vindas');
+                    return;
+                }
+                await this.loadWelcomeMessage();
                 editModal.style.display = 'none';
             });
 
