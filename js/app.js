@@ -1,4 +1,4 @@
-import { signIn, signOut, isAdmin, createMemory, getMemories, deleteMemory, uploadImage, getMemoryById, addMemoryImages, updateMemory } from './supabase.js';
+import { signIn, signOut, isAdmin, createMemory, getMemories, deleteMemory, uploadImage, getMemoryById, addMemoryImages, updateMemory, getCurrentUser } from './supabase.js';
 
 const START_DATE = new Date("2025-01-06");
 
@@ -126,6 +126,7 @@ class MemoriasApp {
     constructor() {
         this.initializeElements();
         this.youtubePlayer = new YouTubePlayer();
+        this.loadWelcomeMessage();
         this.init();
         this.initYouTubeAPI();
     }
@@ -144,8 +145,80 @@ class MemoriasApp {
             memoriaForm: document.getElementById("memoriaForm"),
             memoriaModal: document.getElementById("memoriaModal"),
             memoriaDetalhes: document.getElementById("memoriaDetalhes"),
-            youtubePlayer: document.getElementById("youtubePlayer")
+            youtubePlayer: document.getElementById("youtubePlayer"),
+            welcomeModal: document.getElementById("welcomeModal"),
+            welcomeEditModal: document.getElementById("welcomeEditModal")
         };
+    }
+
+    async loadWelcomeMessage() {
+        const welcomeMessage = localStorage.getItem('welcomeMessage') || `Bem-vindo à nossa Biblioteca de Memórias
+
+Aqui guardamos nossas memórias mais preciosas, cada uma delas uma página única em nossa história de amor.
+
+Sinta-se à vontade para explorar cada momento especial que compartilhamos.
+
+Role para baixo para continuar lendo...
+
+Com amor,
+O Senhor Aluado`;
+
+        const isAdminResult = await isAdmin();
+        
+        this.elements.welcomeModal.innerHTML = `
+            <div class="welcome-content">
+                <h2 class="welcome-title">Biblioteca de Memórias</h2>
+                <div class="welcome-message">${welcomeMessage}</div>
+                ${isAdminResult ? `
+                    <button class="welcome-edit">
+                        ✎ Editar Mensagem
+                    </button>
+                ` : ''}
+                <button class="welcome-close">Fechar Pergaminho</button>
+            </div>
+        `;
+
+        if (isAdminResult) {
+            this.elements.welcomeModal.innerHTML += `
+                <div id="welcomeEditModal" class="welcome-edit-modal">
+                    <div class="welcome-edit-content">
+                        <h3>Editar Mensagem de Boas-vindas</h3>
+                        <form id="welcomeEditForm">
+                            <textarea id="welcomeMessageEdit">${welcomeMessage}</textarea>
+                            <button type="submit">Salvar</button>
+                            <button type="button" class="close-btn">Cancelar</button>
+                        </form>
+                    </div>
+                </div>
+            `;
+
+            const editBtn = this.elements.welcomeModal.querySelector('.welcome-edit');
+            const editModal = document.getElementById('welcomeEditModal');
+            const editForm = document.getElementById('welcomeEditForm');
+            
+            editBtn.addEventListener('click', () => {
+                editModal.style.display = 'block';
+            });
+
+            editForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const newMessage = document.getElementById('welcomeMessageEdit').value;
+                localStorage.setItem('welcomeMessage', newMessage);
+                this.loadWelcomeMessage();
+                editModal.style.display = 'none';
+            });
+
+            editModal.querySelector('.close-btn').addEventListener('click', () => {
+                editModal.style.display = 'none';
+            });
+        }
+
+        const closeButton = this.elements.welcomeModal.querySelector('.welcome-close');
+        closeButton.addEventListener('click', () => {
+            this.elements.welcomeModal.style.display = 'none';
+        });
+
+        this.elements.welcomeModal.style.display = 'block';
     }
 
     async init() {
@@ -516,8 +589,6 @@ class MemoriasApp {
         if (this.elements.loginModal) this.elements.loginModal.style.display = 'none';
         if (this.elements.memoriaModal) {
             this.elements.memoriaModal.style.display = 'none';
-            // Don't destroy the player when closing the modal
-            // this.youtubePlayer.destroy();
         }
     }
 }
