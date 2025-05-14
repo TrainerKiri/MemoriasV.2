@@ -5,7 +5,7 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-export const ADMIN_USER_ID = '9f657d83-d2ac-4629-a755-6fc4b37efe22';
+export const ADMIN_USER_ID = '58d41620-12d5-4847-a0e3-dc085da9fef6';
 
 // Auth functions
 export async function signUp(email, password) {
