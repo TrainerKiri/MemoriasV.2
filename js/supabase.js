@@ -1,206 +1,99 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseKey)
 
-export const ADMIN_USER_ID = '58d41620-12d5-4847-a0e3-dc085da9fef6';
-
-// Auth functions
-export async function signUp(email, password) {
-    const { data, error } = await supabase.auth.signUp({
-        email,
-        password
-    });
-    return { data, error };
-}
-
-export async function signIn(email, password) {
-    const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-    });
-    return { data, error };
-}
-
-export async function signOut() {
-    const { error } = await supabase.auth.signOut();
-    return { error };
-}
-
-export async function getCurrentUser() {
-    const { data: { user }, error } = await supabase.auth.getUser();
-    if (error) {
-        console.error('Erro ao obter usuário atual:', error);
-        return null;
-    }
-    return user;
-}
-
-export async function isAdmin() {
-    const user = await getCurrentUser();
-    return user && user.id === ADMIN_USER_ID;
-}
-
-// Welcome Message functions
-export async function getWelcomeMessage() {
-    try {
-        const { data, error } = await supabase
-            .from('welcome_messages')
-            .select('message')
-            .single();
-        
-        if (error) throw error;
-        return data.message;
-    } catch (error) {
-        console.error('Error fetching welcome message:', error);
-        return null;
-    }
-}
-
-export async function updateWelcomeMessage(message) {
-    try {
-        const { data, error } = await supabase
-            .from('welcome_messages')
-            .update({ message })
-            .eq('id', (await supabase.from('welcome_messages').select('id').single()).data.id)
-            .select();
-
-        if (error) throw error;
-        return { data };
-    } catch (error) {
-        console.error('Error updating welcome message:', error);
-        return { error };
-    }
-}
-
-// Memory functions
-export async function createMemory(memory) {
-    const user = await getCurrentUser();
-    if (!user) {
-        return { error: { message: 'Usuário não autenticado' } };
-    }
-    
-    if (user.id !== ADMIN_USER_ID) {
-        return { error: { message: 'Apenas o administrador pode adicionar memórias' } };
-    }
-    
-    const { data, error } = await supabase
-        .from('memories')
-        .insert([{
-            title: memory.title,
-            description: memory.description,
-            date: memory.date,
-            image_url: memory.image_url,
-            youtube_url: memory.youtube_url,
-            user_id: user.id
-        }])
-        .select();
-    return { data, error };
-}
-
+// Função para buscar todas as memórias
 export async function getMemories() {
-    const { data, error } = await supabase
-        .from('memories')
-        .select(`
-            *,
-            memory_images (
-                id,
-                url,
-                description
-            )
-        `)
-        .order('date', { ascending: true });
-    return { data, error };
-}
-
-export async function getMemoryById(id) {
-    const { data, error } = await supabase
-        .from('memories')
-        .select(`
-            *,
-            memory_images (
-                id,
-                url,
-                description
-            )
-        `)
-        .eq('id', id)
-        .single();
-    return { data, error };
-}
-
-export async function updateMemory(id, memory) {
-    const user = await getCurrentUser();
-    if (!user || user.id !== ADMIN_USER_ID) {
-        return { error: { message: 'Apenas o administrador pode atualizar memórias' } };
+    try {
+        const { data, error } = await supabase
+            .from('memories')
+            .select('*')
+            .order('date', { ascending: false })
+        
+        if (error) throw error
+        return data
+    } catch (error) {
+        console.error('Erro ao buscar memórias:', error)
+        return []
     }
-    
-    const { data, error } = await supabase
-        .from('memories')
-        .update({
-            title: memory.title,
-            description: memory.description,
-            date: memory.date,
-            image_url: memory.image_url,
-            youtube_url: memory.youtube_url
+}
+
+// Função para buscar tags
+export async function getTags() {
+    try {
+        const { data, error } = await supabase
+            .from('tags')
+            .select('*')
+            .order('name')
+        
+        if (error) throw error
+        return data
+    } catch (error) {
+        console.error('Erro ao buscar tags:', error)
+        return []
+    }
+}
+
+// Função para adicionar nova memória (admin)
+export async function addMemory(memoryData) {
+    try {
+        const { data, error } = await supabase
+            .from('memories')
+            .insert([memoryData])
+            .select()
+        
+        if (error) throw error
+        return data[0]
+    } catch (error) {
+        console.error('Erro ao adicionar memória:', error)
+        throw error
+    }
+}
+
+// Função para verificar se é admin
+export async function isAdmin() {
+    try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return false
+        
+        const { data, error } = await supabase
+            .from('admin_users')
+            .select('id')
+            .eq('id', user.id)
+            .single()
+        
+        return !error && data
+    } catch (error) {
+        return false
+    }
+}
+
+// Função para login
+export async function signIn(email, password) {
+    try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email,
+            password
         })
-        .eq('id', id)
-        .select();
-    return { data, error };
+        
+        if (error) throw error
+        return data
+    } catch (error) {
+        console.error('Erro no login:', error)
+        throw error
+    }
 }
 
-export async function deleteMemory(id) {
-    const user = await getCurrentUser();
-    if (!user || user.id !== ADMIN_USER_ID) {
-        return { error: { message: 'Apenas o administrador pode excluir memórias' } };
+// Função para logout
+export async function signOut() {
+    try {
+        const { error } = await supabase.auth.signOut()
+        if (error) throw error
+    } catch (error) {
+        console.error('Erro no logout:', error)
+        throw error
     }
-    
-    const { error } = await supabase
-        .from('memories')
-        .delete()
-        .eq('id', id);
-    return { error };
-}
-
-export async function uploadImage(file) {
-    const user = await getCurrentUser();
-    if (!user || user.id !== ADMIN_USER_ID) {
-        return { error: { message: 'Apenas o administrador pode fazer upload de imagens' } };
-    }
-    
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Math.random()}.${fileExt}`;
-    const filePath = `${fileName}`;
-
-    const { data, error } = await supabase.storage
-        .from('memories')
-        .upload(filePath, file);
-
-    if (error) return { error };
-
-    const { data: { publicUrl } } = supabase.storage
-        .from('memories')
-        .getPublicUrl(filePath);
-
-    return { data: publicUrl, error: null };
-}
-
-export async function addMemoryImages(memoryId, images) {
-    const user = await getCurrentUser();
-    if (!user || user.id !== ADMIN_USER_ID) {
-        return { error: { message: 'Apenas o administrador pode adicionar imagens' } };
-    }
-
-    const { data, error } = await supabase
-        .from('memory_images')
-        .insert(images.map(img => ({
-            memory_id: memoryId,
-            url: img.url,
-            description: img.description
-        })))
-        .select();
-
-    return { data, error };
 }
